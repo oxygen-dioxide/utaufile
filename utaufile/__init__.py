@@ -160,9 +160,3 @@ def openust(filename:str):#打开ust文件，返回ustfile对象
         lyric=noteproperties.pop("Lyric")
         notes+=[ustnote(length,lyric,notenum,noteproperties)]
     return ustfile(fileproperties,notes)
-    
-#测试
-if(__name__=='__main__'):
-    a=openust(r"E:\Music-----------------\曲谱\冠世一战MIDI by葩皇_.ust")
-    print(a)
-    pass
