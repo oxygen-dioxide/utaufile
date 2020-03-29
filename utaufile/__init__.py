@@ -1,5 +1,5 @@
 from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
-class ustnote():
+class Ustnote():
     #length:时长，480为一拍，整数
     #lyric:歌词，字符串
     #notenum:音高
@@ -17,56 +17,56 @@ class ustnote():
     def isR(self)->bool:
         return (self.lyric in [""," ","r","R"])
 
-class ustfile():
+class Ustfile():
     def __init__(self,properties={},notes=[]):
         self.properties=properties
-        self.notes=notes
+        self.note=notes
     def __str__(self):
         s='[#SETTING]\n'
         for i in self.properties.keys():
             s+="{}={}\n".format(i,self.properties[i])
-        for i in range(0,len(self.notes)):
+        for i in range(0,len(self.note)):
             s+='[#{:0>4}]\n'.format(i)
-            s+=str(self.notes[i])
+            s+=str(self.note[i])
         s+="[#TRACKEND]\n"
         return s
     def save(self,filename:str):
         file=open(filename,"w",encoding='utf8')
         file.write("[#VERSION]\nUST Version1.2\nCharset=UTF-8\n")
         file.write(str(self))
-    def getLyric(self,start:int=0,end:int=0,ignoreR:bool=True):
+    def getlyric(self,start:int=0,end:int=0,ignoreR:bool=True):
         #获取歌词
         #ignoreR：忽略休止符
         if(end==0):
-            end=len(self.notes)
+            end=len(self.note)
         lyric=[]
         if(ignoreR):
-            for i in self.notes[start:end]:
+            for i in self.note[start:end]:
                 if(not i.isR()):
                     lyric+=[i.lyric]
         else:
-            for i in self.notes[start:end]:
+            for i in self.note[start:end]:
                 lyric+=[i.lyric]
         return(lyric)
-    def replaceLyric(self,dictionary:dict,start:int=0,end:int=0):
+    def replacelyric(self,dictionary:dict,start:int=0,end:int=0):
         #按字典替换歌词
         if(end==0):
-            end=len(self.notes)
+            end=len(self.note)
         for i in range(start,end):
-            self.notes[i].lyric=dictionary.get(self.notes[i].lyric,default=self.notes[i].lyric)
-    def setLyric(self,lyrics:list,start:int=0,end:int=0,ignoreR:bool=True):
+            self.note[i].lyric=dictionary.get(self.note[i].lyric,default=self.note[i].lyric)
+    def setlyric(self,lyrics:list,start:int=0,end:int=0,ignoreR:bool=True):
         #批量输入歌词
         #ignoreR：忽略休止符
         if(end==0):
-            end=len(self.notes)
+            end=len(self.note)
         if(ignoreR):
             j=0
             l=len(lyrics)
             for i in range(start,end):
-                if(not self.notes[i].isR()):
+                if(not self.note[i].isR()):
                     if(j>=l):
                         break
-                    self.notes[i].lyric=lyrics[j]
+                    self.note[i].lyric=lyrics[j]
                     j=j+1
         else:
             j=0
@@ -74,12 +74,12 @@ class ustfile():
             for i in range(start,end):
                 if(j>=l):
                     break
-                self.notes[i].lyric=lyrics[j]
+                self.note[i].lyric=lyrics[j]
                 j=j+1
-    def toMidiTrack(self):
+    def to_midi_track(self):
         track=MidiTrack()
         tick=0
-        for note in self.notes:
+        for note in self.note:
             if(note.isR()):
                 tick+=note.length
             else:
@@ -89,18 +89,18 @@ class ustfile():
                 track.append(Message('note_off',note=note.notenum,velocity=64,time=note.length))
         track.append(MetaMessage('end_of_track'))
         return(track)
-    def toMidiFile(self,filename:str=""):
+    def to_midi_file(self,filename:str=""):
         mid = MidiFile()
         ctrltrack=Miditrack()
         ctrltrack.append(MetaMessage('track_name',name='Control',time=0))
         ctrltrack.append(MetaMessage('set_tempo',tempo=bpm2tempo(self.tempo),time=0))
         mid.tracks.append(ctrltrack)
-        mid.tracks.append(self.toMidiTrack())
+        mid.tracks.append(self.to_midi_track())
         if(filename!=""):
             mid.save(filename)
         return mid    
     
-def ustValueTyper(key,value):#根据ust中的键决定值的类型
+def ustvaluetyper(key,value):#根据ust中的键决定值的类型
     types={
         "Tempo":float,
         "Tracks":int,
@@ -120,7 +120,7 @@ def ustValueTyper(key,value):#根据ust中的键决定值的类型
     else:
         return valuetype(value)
 
-def openust(filename:str):#打开ust文件，返回ustfile对象
+def openust(filename:str):#打开ust文件，返回Ustfile对象
     encoding='utf8'
     #读ust文件
     file=open(filename,'r',encoding=encoding)
@@ -140,7 +140,7 @@ def openust(filename:str):#打开ust文件，返回ustfile对象
         if("=" in line):
             [key,value]=line.split("=")
             if(value!=""):
-                fileproperties[key]=ustValueTyper(key,value)
+                fileproperties[key]=ustvaluetyper(key,value)
     #读音符
     notes=[]
     for block in blocks[3:]:
@@ -149,12 +149,12 @@ def openust(filename:str):#打开ust文件，返回ustfile对象
             if("=" in line):
                 [key,value]=line.split("=")
                 if(value!=""):
-                    noteproperties[key]=ustValueTyper(key,value)
+                    noteproperties[key]=ustvaluetyper(key,value)
         length=noteproperties.pop("Length")
         notenum=noteproperties.pop("NoteNum")
         lyric=noteproperties.pop("Lyric")
-        notes+=[ustnote(length,lyric,notenum,noteproperties)]
-    return ustfile(fileproperties,notes)
+        notes+=[Ustnote(length,lyric,notenum,noteproperties)]
+    return Ustfile(fileproperties,notes)
 
 def readint(flag):
     for i in range(0,len(flag)):
