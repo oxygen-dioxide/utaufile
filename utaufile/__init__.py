@@ -34,7 +34,7 @@ class ustfile():
         file=open(filename,"w",encoding='utf8')
         file.write("[#VERSION]\nUST Version1.2\nCharset=UTF-8\n")
         file.write(str(self))
-    def getlyric(self,start:int=0,end:int=0,ignoreR:bool=True):
+    def getLyric(self,start:int=0,end:int=0,ignoreR:bool=True):
         #获取歌词
         #ignoreR：忽略休止符
         if(end==0):
@@ -48,13 +48,13 @@ class ustfile():
             for i in self.notes[start:end]:
                 lyric+=[i.lyric]
         return(lyric)
-    def replacelyric(self,dictionary:dict,start:int=0,end:int=0):
+    def replaceLyric(self,dictionary:dict,start:int=0,end:int=0):
         #按字典替换歌词
         if(end==0):
             end=len(self.notes)
         for i in range(start,end):
             self.notes[i].lyric=dictionary.get(self.notes[i].lyric,default=self.notes[i].lyric)
-    def setlyric(self,lyrics:list,start:int=0,end:int=0,ignoreR:bool=True):
+    def setLyric(self,lyrics:list,start:int=0,end:int=0,ignoreR:bool=True):
         #批量输入歌词
         #ignoreR：忽略休止符
         if(end==0):
@@ -100,7 +100,7 @@ class ustfile():
             mid.save(filename)
         return mid    
     
-def ustvaluetyper(key,value):#根据ust中的键决定值的类型
+def ustValueTyper(key,value):#根据ust中的键决定值的类型
     types={
         "Tempo":float,
         "Tracks":int,
@@ -122,11 +122,6 @@ def ustvaluetyper(key,value):#根据ust中的键决定值的类型
 
 def openust(filename:str):#打开ust文件，返回ustfile对象
     encoding='utf8'
-    #编码检测
-    #infile=open(filename,'rb')
-    #encoding=chardet.detect(infile.read)['encoding']
-    #infile.close()
-    
     #读ust文件
     file=open(filename,'r',encoding=encoding)
     #分块
@@ -145,7 +140,7 @@ def openust(filename:str):#打开ust文件，返回ustfile对象
         if("=" in line):
             [key,value]=line.split("=")
             if(value!=""):
-                fileproperties[key]=ustvaluetyper(key,value)
+                fileproperties[key]=ustValueTyper(key,value)
     #读音符
     notes=[]
     for block in blocks[3:]:
@@ -154,9 +149,42 @@ def openust(filename:str):#打开ust文件，返回ustfile对象
             if("=" in line):
                 [key,value]=line.split("=")
                 if(value!=""):
-                    noteproperties[key]=ustvaluetyper(key,value)
+                    noteproperties[key]=ustValueTyper(key,value)
         length=noteproperties.pop("Length")
         notenum=noteproperties.pop("NoteNum")
         lyric=noteproperties.pop("Lyric")
         notes+=[ustnote(length,lyric,notenum,noteproperties)]
     return ustfile(fileproperties,notes)
+
+def readint(flag):
+    for i in range(0,len(flag)):
+        if(not flag[i].isdigit()):
+            break
+    else:
+        i+=1
+    value=int(flag[0:i])
+    flag=flag[i:]
+    return(flag,value)
+    
+def parseflag(flag:str,flagtype,usedefault=False):
+    #解析flag，返回字典
+    #flagtype为由元组组成的集合
+    #每个元组第0项为字符串,例如"b","g","Mt"等，第1项为默认值
+    #如果usedefault=True，则返回字典会包含输入flag中没有的条目，且代入默认值
+    if(usedefault):
+        flagdict={i[0]:i[1] for i in flagtype}
+    else:
+        flagdict={}
+    while(flag!=""):
+        for i in flagtype:
+            if(flag.startswith(i[0])):
+                flag=flag[len(i):]
+                if(type(i[1])==int):
+                    (flag,value)=readint(flag)
+                    flagdict[i[0]]=value
+                elif(type(i[1])==bool):
+                    flagdict[i[0]]=True
+                break
+        else:
+            flag=flag[1:]
+    return flagdict
