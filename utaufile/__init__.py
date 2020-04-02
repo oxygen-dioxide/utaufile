@@ -1,3 +1,5 @@
+__version__='0.0.1'
+
 from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
 
 
@@ -403,5 +405,3 @@ def notenum2str(notenum:int):
         "A#",
         "B"]
     return notenumstrs[notenum%12]+str((notenum)//12-1)
-    pass
-#TODO
