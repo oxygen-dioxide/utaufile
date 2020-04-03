@@ -85,7 +85,7 @@ class Ustfile():
         if(end==0):
             end=len(self.note)
         for i in range(0,len(self.note))[start:end]:
-            self.note[i].lyric=dictionary.get(self.note[i].lyric,default=self.note[i].lyric)
+            self.note[i].lyric=dictionary.get(self.note[i].lyric,self.note[i].lyric)
             
     def setlyric(self,lyrics:list,start:int=0,end:int=0,ignoreR:bool=True):
         '''
@@ -191,19 +191,34 @@ def openust(filename:str):
     '''
     打开ust文件，返回Ustfile对象
     '''
-    encoding='utf8'
     #读ust文件
-    file=open(filename,'r',encoding=encoding)
+    f=open(filename,'rb')
+    file=f.read()
+    f.close()
+    #读取编码
+    if(b"Charset=UTF-8" in file):
+        encoding="utf-8"
+    else:
+        encoding="shift-JIS"
     #分块
     blocks=[]
     block=[]
-    for line in file.readlines():
-        line=line.strip("\n")
-        if(line[0]=="["):
+    for line in file.split(b"\n"):
+        line=line.strip(b"\r")
+        #逐行解码
+        try:
+            line=str(line,encoding=encoding)
+        except:
+            #如果某行编码与其他行不同，则尝试各种编码
+            for i in ["gbk","utf-8","shift-JIS"]:
+                try:
+                    line=str(line,encoding=i)
+                except:
+                    pass
+        if(line.startswith("[")):
             blocks+=[block]
             block=[]
         block+=[line]
-    file.close()    
     #读文件头
     fileproperties={}
     for line in blocks[2]:
@@ -264,7 +279,7 @@ def parseflag(flag:str,flagtype,usedefault=False):
 #NN
 class Nnnote():
     '''
-    nn音符对象
+    nn音符类
     hanzi:歌词汉字
     pinyin:歌词拼音
     start:起点，以32分音符为单位（四分音符为8）
@@ -320,6 +335,7 @@ class Nnnote():
 
 class Nnfile():
     '''
+    nn文件类
     tempo:曲速，float
     beats:节拍，元组，第0项为每小节拍数，第1项为以X分音符为1拍
     note:音符，Nnnote的列表
