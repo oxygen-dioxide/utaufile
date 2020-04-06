@@ -7,7 +7,7 @@ from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
 
 class Ustnote():
     '''
-    UST音符类
+    ust音符类
     length:时长，480为一拍，int
     lyric:歌词，str
     notenum:音高,C4为60，int
@@ -31,7 +31,7 @@ class Ustnote():
 
 class Ustfile():
     '''
-    UST文件类
+    ust文件类
     properties:工程整体属性(即[#SETTING]块),dict
     note:音符，list                    
     '''
@@ -119,7 +119,7 @@ class Ustfile():
                 
     def to_midi_track(self):
         '''
-        将UST文件对象转换为mido.MidiTrack对象
+        将ust文件对象转换为mido.MidiTrack对象
         '''
         track=MidiTrack()
         tick=0
@@ -136,7 +136,7 @@ class Ustfile():
     
     def to_midi_file(self,filename:str=""):
         '''
-        将UST文件对象转换为mid文件
+        将ust文件对象转换为mid文件和mido.MidiFile对象
         '''
         mid = MidiFile()
         ctrltrack=Miditrack()
@@ -150,7 +150,7 @@ class Ustfile():
     
     def to_nn_file(self):
         '''
-        将UST文件对象转换为nn文件对象
+        将ust文件对象转换为nn文件对象
         '''
         nn=Nnfile(tempo=self.properties.get("Tempo",120))
         time=0
@@ -280,22 +280,22 @@ def parseflag(flag:str,flagtype,usedefault=False):
 class Nnnote():
     '''
     nn音符类
-    hanzi:歌词汉字
-    pinyin:歌词拼音
-    start:起点，以32分音符为单位（四分音符为8）
-    length:长度，以32分音符为单位
-    notenum:音高，与midi及ust相同，即C4为60，音高越高，数值越大
+    hanzi:歌词汉字，str
+    pinyin:歌词拼音，str
+    start:起点，以32分音符为单位（四分音符为8），int
+    length:长度，以32分音符为单位，int
+    notenum:音高，与midi及ust相同，即C4为60，音高越高，数值越大，int
     注意：该notenum的表示法与nn文件不同，nn文件中音高的表示方法为B5为0，音高越低，数值越大
     83-notenum
-    cle:清晰度
-    vel:急促度
-    por:滑音起始
-    viblen:颤音长度
-    vibdep:颤音幅度
-    vibrat:颤音速率
+    cle:清晰度，int
+    vel:急促度，int
+    por:滑音起始，int
+    viblen:颤音长度，int
+    vibdep:颤音幅度，int
+    vibrat:颤音速率，int
     dyn:音量曲线
-    pit:音高曲线
-    pbs:音高弯曲灵敏度
+    pit:音高曲线，以50为基准
+    pbs:音高弯曲灵敏度，取值范围是0至11，但实际上表示1至12，int
     '''
     def __init__(self,hanzi:str,pinyin:str,start:int,length:int,
             notenum:int,cle:int=50,vel:int=50,por:int=0,
@@ -373,6 +373,22 @@ class Nnfile():
         file=open(filename,encoding="utf8",mode="w")
         file.write(str(self))
         file.close()
+    
+    def to_ust_file(self,use_hanzi=False):
+        '''
+        将nn文件对象转换为ust文件对象
+        '''
+        ust=Ustfile(properties={'Tempo:self.tempo'})
+        time=0
+        for note in self.note:
+            if(note.start>time):
+                ust.note+=[Ustnote(length=(note.start-time)*60,lyric="R",notenum=60)]
+            if(use_hanzi):
+                lyric=note.hanzi
+            else:
+                lyric=note.pinyin
+            ust.note+=[Ustnote(length=note.length*60,lyric=lyric,notenum=note.notenum)]
+        return ust
     
 def opennn(filename:str):
     '''

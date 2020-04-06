@@ -1,3 +1,6 @@
+'''
+utaufile.flag包括不同utau引擎的flag预设，供utaufile.parseflag()使用
+'''
 resampler={
     ('a',100),
     ('B',50),

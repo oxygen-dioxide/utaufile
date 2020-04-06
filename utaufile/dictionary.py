@@ -1,3 +1,8 @@
+'''
+utaufile.dictionary包括歌词转换字典，供utaufile.replacelyric()使用
+ro2hi:罗马音转平假名
+hi2ro:平假名转罗马音
+'''
 #罗马音转平假名
 ro2hi={
     "a":"あ",
