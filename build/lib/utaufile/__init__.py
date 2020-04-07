@@ -1,6 +1,7 @@
-__version__='0.0.2'
+__version__='0.0.1'
 
 from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
+
 
 #UTAU
 
@@ -12,7 +13,7 @@ class Ustnote():
     notenum:音高,C4为60，int
     properties:其他所有数据，dict
     '''
-    def __init__(self,length:int,lyric:str,notenum:int,properties:dict={}):
+    def __init__(self,length:int,lyric:str,notenum:int,properties={}):
         self.length=length
         self.lyric=lyric
         self.notenum=notenum 
@@ -34,7 +35,7 @@ class Ustfile():
     properties:工程整体属性(即[#SETTING]块),dict
     note:音符，list                    
     '''
-    def __init__(self,properties:dict={},notes:list=[]):
+    def __init__(self,properties={},notes=[]):
         self.properties=properties
         self.note=notes
         
@@ -250,7 +251,7 @@ def readint(flag):
     flag=flag[i:]
     return(flag,value)
     
-def parseflag(flag:str,flagtype,usedefault=False)->dict:
+def parseflag(flag:str,flagtype,usedefault=False):
     '''
     解析flag，返回字典
     flagtype：由元组组成的集合，每个元组第0项为字符串,例如"b","g","Mt"等，第1项为默认值。可参考utaufile.flag库
@@ -339,7 +340,7 @@ class Nnfile():
     beats:节拍，元组，第0项为每小节拍数，第1项为以X分音符为1拍
     note:音符，Nnnote的列表
     '''
-    def __init__(self,tempo:int=120,beat:tuple=(4,4),note:list=[]):
+    def __init__(self,tempo:int=120,beats=(4,4),note=[]):
         self.tempo=tempo
         self.beats=beats
         self.note=note
@@ -365,7 +366,7 @@ class Nnfile():
             s+=str(i)
         return s
     
-    def save(self,filename:str):
+    def save(self,filename):
         '''
         保存nn文件
         '''
@@ -373,10 +374,9 @@ class Nnfile():
         file.write(str(self))
         file.close()
     
-    def to_ust_file(self,use_hanzi:bool=False):
+    def to_ust_file(self,use_hanzi=False):
         '''
         将nn文件对象转换为ust文件对象
-        默认使用nn文件中的拼音，如果需要使用汉字，需指定use_hanzi=True
         '''
         ust=Ustfile(properties={'Tempo:self.tempo'})
         time=0

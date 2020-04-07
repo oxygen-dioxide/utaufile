@@ -1,0 +1,23 @@
+Metadata-Version: 2.1
+Name: utaufile
+Version: 0.0.2
+Summary: Read and write UTAU ust file and NiaoNIAO nn file
+Home-page: https://gitee.com/oxygendioxide/utaufile
+Author: oxygen dioxide
+Author-email: 1463567152@qq.com
+License: Apache
+Description: 
+        # Utaufile
+        
+        #### 介绍
+        操作UTAU ust文件的python库
+        
+        
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Requires-Python: >=3.6.0
+Description-Content-Type: text/markdown

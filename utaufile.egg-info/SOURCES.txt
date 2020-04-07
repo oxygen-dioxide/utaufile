@@ -1,0 +1,10 @@
+README.md
+setup.py
+utaufile/__init__.py
+utaufile/dictionary.py
+utaufile/flag.py
+utaufile.egg-info/PKG-INFO
+utaufile.egg-info/SOURCES.txt
+utaufile.egg-info/dependency_links.txt
+utaufile.egg-info/requires.txt
+utaufile.egg-info/top_level.txt
