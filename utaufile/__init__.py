@@ -1,7 +1,6 @@
 __version__='0.0.2'
 
 from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
-
 #UTAU
 
 class Ustnote():
@@ -18,7 +17,7 @@ class Ustnote():
         self.notenum=notenum 
         self.properties=properties
     def __str__(self):
-        s="Length={}\nLyrics={}\nNoteNum={}\n".format(self.length,self.lyric,self.notenum)
+        s="Length={}\nLyric={}\nNoteNum={}\n".format(self.length,self.lyric,self.notenum)
         for i in self.properties.keys():
             s+="{}={}\n".format(i,self.properties[i])
         return s
@@ -388,7 +387,7 @@ class Nnfile():
         将nn文件对象转换为ust文件对象
         默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
         '''
-        ust=Ustfile(properties={'Tempo:self.tempo'})
+        ust=Ustfile(properties={'Tempo':self.tempo})
         time=0
         for note in self.note:
             if(note.start>time):
@@ -398,13 +397,13 @@ class Nnfile():
             else:
                 lyric=note.pinyin
             ust.note+=[Ustnote(length=note.length*60,lyric=lyric,notenum=note.notenum)]
+            time=note.length+note.start
         return ust
     def to_midi_track(self,use_hanzi:bool=False):
         '''
         将nn文件对象转换为mido.MidiTrack对象
         默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
         '''
-        self.sort()
         track=MidiTrack()
         time=0
         for note in self.note:
