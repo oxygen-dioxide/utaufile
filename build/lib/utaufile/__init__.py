@@ -1,8 +1,6 @@
-__version__='0.0.1'
+__version__='0.0.2'
 
 from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
-
-
 #UTAU
 
 class Ustnote():
@@ -13,13 +11,13 @@ class Ustnote():
     notenum:音高,C4为60，int
     properties:其他所有数据，dict
     '''
-    def __init__(self,length:int,lyric:str,notenum:int,properties={}):
+    def __init__(self,length:int,lyric:str,notenum:int,properties:dict={}):
         self.length=length
         self.lyric=lyric
         self.notenum=notenum 
         self.properties=properties
     def __str__(self):
-        s="Length={}\nLyrics={}\nNoteNum={}\n".format(self.length,self.lyric,self.notenum)
+        s="Length={}\nLyric={}\nNoteNum={}\n".format(self.length,self.lyric,self.notenum)
         for i in self.properties.keys():
             s+="{}={}\n".format(i,self.properties[i])
         return s
@@ -35,7 +33,7 @@ class Ustfile():
     properties:工程整体属性(即[#SETTING]块),dict
     note:音符，list                    
     '''
-    def __init__(self,properties={},notes=[]):
+    def __init__(self,properties:dict={},notes:list=[]):
         self.properties=properties
         self.note=notes
         
@@ -139,9 +137,9 @@ class Ustfile():
         将ust文件对象转换为mid文件和mido.MidiFile对象
         '''
         mid = MidiFile()
-        ctrltrack=Miditrack()
+        ctrltrack=MidiTrack()
         ctrltrack.append(MetaMessage('track_name',name='Control',time=0))
-        ctrltrack.append(MetaMessage('set_tempo',tempo=bpm2tempo(self.tempo),time=0))
+        ctrltrack.append(MetaMessage('set_tempo',tempo=bpm2tempo(self.properties.get("Tempo",120)),time=0))
         mid.tracks.append(ctrltrack)
         mid.tracks.append(self.to_midi_track())
         if(filename!=""):
@@ -251,7 +249,7 @@ def readint(flag):
     flag=flag[i:]
     return(flag,value)
     
-def parseflag(flag:str,flagtype,usedefault=False):
+def parseflag(flag:str,flagtype,usedefault=False)->dict:
     '''
     解析flag，返回字典
     flagtype：由元组组成的集合，每个元组第0项为字符串,例如"b","g","Mt"等，第1项为默认值。可参考utaufile.flag库
@@ -275,7 +273,17 @@ def parseflag(flag:str,flagtype,usedefault=False):
             flag=flag[1:]
     return flagdict
 
-
+def dumpflag(flagdict:dict)->str:
+    '''
+    将flag字典转换为字符串
+    '''
+    flag=""
+    for (key,value) in flagdict.items():
+        if(value==True):
+            flag+=key
+        elif(type(value)==int):
+            flag+=key+str(value)
+    return flag
 #NN
 class Nnnote():
     '''
@@ -340,7 +348,7 @@ class Nnfile():
     beats:节拍，元组，第0项为每小节拍数，第1项为以X分音符为1拍
     note:音符，Nnnote的列表
     '''
-    def __init__(self,tempo:int=120,beats=(4,4),note=[]):
+    def __init__(self,tempo:int=120,beats:tuple=(4,4),note:list=[]):
         self.tempo=tempo
         self.beats=beats
         self.note=note
@@ -366,7 +374,7 @@ class Nnfile():
             s+=str(i)
         return s
     
-    def save(self,filename):
+    def save(self,filename:str):
         '''
         保存nn文件
         '''
@@ -374,11 +382,12 @@ class Nnfile():
         file.write(str(self))
         file.close()
     
-    def to_ust_file(self,use_hanzi=False):
+    def to_ust_file(self,use_hanzi:bool=False):
         '''
         将nn文件对象转换为ust文件对象
+        默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
         '''
-        ust=Ustfile(properties={'Tempo:self.tempo'})
+        ust=Ustfile(properties={'Tempo':self.tempo})
         time=0
         for note in self.note:
             if(note.start>time):
@@ -388,7 +397,41 @@ class Nnfile():
             else:
                 lyric=note.pinyin
             ust.note+=[Ustnote(length=note.length*60,lyric=lyric,notenum=note.notenum)]
+            time=note.length+note.start
         return ust
+    def to_midi_track(self,use_hanzi:bool=False):
+        '''
+        将nn文件对象转换为mido.MidiTrack对象
+        默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
+        '''
+        track=MidiTrack()
+        time=0
+        for note in self.note:
+            if(use_hanzi):
+                track.append(MetaMessage('lyrics',text=note.hanzi,time=(note.start-time)*60))
+            else:
+                track.append(MetaMessage('lyrics',text=note.pinyin,time=(note.start-time)*60))
+            track.append(Message('note_on', note=note.notenum,velocity=64,time=0))
+            track.append(Message('note_off',note=note.notenum,velocity=64,time=note.length*60))
+            time=note.start+note.length
+        track.append(MetaMessage('end_of_track'))
+        return track
+
+    def to_midi_file(self,filename:str="",use_hanzi:bool=False):
+        '''
+        将nn文件对象转换为mid文件与mido.MidiFile对象
+        默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
+        '''
+        mid = MidiFile()
+        ctrltrack=MidiTrack()
+        ctrltrack.append(MetaMessage('track_name',name='Control',time=0))
+        ctrltrack.append(MetaMessage('set_tempo',tempo=bpm2tempo(self.tempo),time=0))
+        mid.tracks.append(ctrltrack)
+        mid.tracks.append(self.to_midi_track(use_hanzi))
+        if(filename!=""):
+            mid.save(filename)
+        return mid
+        pass
     
 def opennn(filename:str):
     '''
@@ -416,24 +459,11 @@ def opennn(filename:str):
         dyn=[int(i) for i in line[11].split(",")[1:]]
         pit=[int(i) for i in line[12].split(",")[1:]]
         pbs=int(line[13])
-        note+=Nnnote(hanzi,pinyin,start,length,notenum,cle,vel,por,
-            viblen,vibdep,vibrat,dyn,pit,pbs)
+        note+=[Nnnote(hanzi,pinyin,start,length,notenum,cle,vel,por,viblen,vibdep,vibrat,dyn,pit,pbs)]
     return Nnfile(tempo=tempo,beats=beats,note=note)
 def notenum2str(notenum:int):
     '''
     将mid和ust中的音高（C4为60）转为字符串
     '''
-    notenumstrs=[
-        "C",
-        "C#",
-        "D",
-        "D#",
-        "E",
-        "F",
-        "F#",
-        "G",
-        "G#",
-        "A",
-        "A#",
-        "B"]
+    notenumstrs=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
     return notenumstrs[notenum%12]+str((notenum)//12-1)

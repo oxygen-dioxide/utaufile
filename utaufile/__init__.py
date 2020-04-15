@@ -1,8 +1,10 @@
-__version__='0.0.2'
+__version__='0.0.3'
 
+import math
+import numpy as np
 from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
-#UTAU
 
+#UTAU
 class Ustnote():
     '''
     ust音符类
@@ -301,14 +303,14 @@ class Nnnote():
     viblen:颤音长度，int
     vibdep:颤音幅度，int
     vibrat:颤音速率，int
-    dyn:音量曲线
-    pit:音高曲线，以50为基准
+    dyn:音量曲线，取值范围0~100，numpy.ndarray
+    pit:音高曲线，以50为基准，取值范围0~100，numpy.ndarray
     pbs:音高弯曲灵敏度，取值范围是0至11，但实际上表示1至12，int
     '''
     def __init__(self,hanzi:str,pinyin:str,start:int,length:int,
             notenum:int,cle:int=50,vel:int=50,por:int=0,
-            viblen:int=0,vibdep:int=0,vibrat:int=0,dyn=[50]*100,
-            pit=[50]*100,pbs:int=0):
+            viblen:int=0,vibdep:int=0,vibrat:int=0,dyn=np.ones(100)*50,
+            pit=np.ones(100)*50,pbs:int=0):
         self.hanzi=hanzi
         self.pinyin=pinyin
         self.start=start
@@ -336,11 +338,23 @@ class Nnnote():
             str(self.viblen),
             str(self.vibdep),
             str(self.vibrat),
-            ",".join(["100"]+[str(i) for i in self.dyn]),
-            ",".join(["100"]+[str(i) for i in self.pit]),
+            ",".join(["100"]+[str(int(i)) for i in self.dyn]),
+            ",".join(["100"]+[str(int(i)) for i in self.pit]),
             str(self.pbs)])+"\n"
         return s
-
+    def getpitbend(self):
+        '''
+        获得音符的pit参数对音符的作用量（pit*pbs）,单位为半音，返回numpy.ndarray
+        '''
+        return (self.pit-50)*(self.pbs+1)/50
+    
+    def setpitbend(self,pitbend):
+        '''
+        设置音符的pit参数对音符的作用量（pit*pbs）,单位为半音，输入类型为长度100的numpy.ndarray
+        '''
+        self.pbs=min(math.ceil(max(abs(pitbend))),12)-1
+        self.pit=(pitbend/(self.pbs+1)*50+50)
+        
 class Nnfile():
     '''
     nn文件类
@@ -456,8 +470,8 @@ def opennn(filename:str):
         viblen=int(line[8])
         vibdep=int(line[9])
         vibrat=int(line[10])
-        dyn=[int(i) for i in line[11].split(",")[1:]]
-        pit=[int(i) for i in line[12].split(",")[1:]]
+        dyn=np.array([int(i) for i in line[11].split(",")[1:]])
+        pit=np.array([int(i) for i in line[12].split(",")[1:]])
         pbs=int(line[13])
         note+=[Nnnote(hanzi,pinyin,start,length,notenum,cle,vel,por,viblen,vibdep,vibrat,dyn,pit,pbs)]
     return Nnfile(tempo=tempo,beats=beats,note=note)
