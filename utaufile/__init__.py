@@ -12,17 +12,21 @@ class Ustnote():
     lyric:歌词，str
     notenum:音高,C4为60，int
     properties:其他所有数据，dict
+    properties中，以"_"开头的键被视为临时变量，不被写入UST文件
     '''
     def __init__(self,length:int,lyric:str,notenum:int,properties:dict={}):
         self.length=length
         self.lyric=lyric
         self.notenum=notenum 
         self.properties=properties
+        
     def __str__(self):
         s="Length={}\nLyric={}\nNoteNum={}\n".format(self.length,self.lyric,self.notenum)
         for i in self.properties.keys():
-            s+="{}={}\n".format(i,self.properties[i])
+            if(not i.startswith("_")):
+                s+="{}={}\n".format(i,self.properties[i])
         return s
+    
     def isR(self)->bool:
         '''
         判断音符是否为休止符(“r”,“R”,“”,“ ”)
@@ -53,9 +57,9 @@ class Ustfile():
         '''
         保存UST文件
         '''
-        file=open(filename,"w",encoding='utf8')
-        file.write("[#VERSION]\nUST Version1.2\nCharset=UTF-8\n")
-        file.write(str(self))
+        with open(filename,"w",encoding='utf8') as file:
+            file.write("[#VERSION]\nUST Version1.2\nCharset=UTF-8\n")
+            file.write(str(self))
         
     def getlyric(self,start:int=0,end:int=0,ignoreR:bool=True)->list:
         '''
@@ -74,7 +78,7 @@ class Ustfile():
         else:
             for i in self.note[start:end]:
                 lyric+=[i.lyric]
-        return(lyric)
+        return lyric
     
     def replacelyric(self,dictionary:dict,start:int=0,end:int=0):
         '''
@@ -86,7 +90,8 @@ class Ustfile():
             end=len(self.note)
         for i in range(0,len(self.note))[start:end]:
             self.note[i].lyric=dictionary.get(self.note[i].lyric,self.note[i].lyric)
-            
+        return self
+    
     def setlyric(self,lyrics:list,start:int=0,end:int=0,ignoreR:bool=True):
         '''
         批量输入歌词
@@ -116,7 +121,22 @@ class Ustfile():
                     break
                 self.note[i].lyric=lyrics[j]
                 j=j+1
-                
+        return self
+    
+    def nrange(self)->tuple:
+        '''
+        获取ust工程的音域
+        返回元组：(最低音,最高音+1)
+        '''
+        notenums=[i.notenum for i in self.note if (not i.isR())]
+        return (min(notenums),max(notenums)+1)
+    
+    def length(self)->int:
+        '''
+        获取ust工程的总长度
+        '''
+        return sum([i.length for i in self.note])
+        
     def to_midi_track(self):
         '''
         将ust文件对象转换为mido.MidiTrack对象
@@ -172,7 +192,7 @@ def ustvaluetyper(key,value):#根据ust中的键决定值的类型
         "Tempo":float,
         "Tracks":int,
         "Mode2":bool,
-        "PreUtterance":int,
+        "PreUtterance":float,
         "VoiceOverlap":int,
         "Velocity":int,
         "Intensity":int,
@@ -192,9 +212,9 @@ def openust(filename:str):
     打开ust文件，返回Ustfile对象
     '''
     #读ust文件
-    f=open(filename,'rb')
-    file=f.read()
-    f.close()
+    with open(filename,'rb') as f:
+        file=f.read()
+
     #读取编码
     if(b"Charset=UTF-8" in file):
         encoding="utf-8"
@@ -374,6 +394,7 @@ class Nnfile():
         def sortkey(note):
             return note.start
         self.note=sorted(self.note,key=sortkey)
+        return self
     
     def __str__(self):
         self.sort()
@@ -392,9 +413,8 @@ class Nnfile():
         '''
         保存nn文件
         '''
-        file=open(filename,encoding="utf8",mode="w")
-        file.write(str(self))
-        file.close()
+        with open(filename,encoding="utf8",mode="w") as file:
+            file.write(str(self))
     
     def to_ust_file(self,use_hanzi:bool=False):
         '''
@@ -413,6 +433,7 @@ class Nnfile():
             ust.note+=[Ustnote(length=note.length*60,lyric=lyric,notenum=note.notenum)]
             time=note.length+note.start
         return ust
+    
     def to_midi_track(self,use_hanzi:bool=False):
         '''
         将nn文件对象转换为mido.MidiTrack对象
@@ -451,33 +472,27 @@ def opennn(filename:str):
     '''
     打开nn文件，返回Nnfile对象
     '''
-    file=open(filename,"r",encoding="utf8")
-    line=file.readline().split(" ")
-    tempo=float(line[0])
-    beats=(int(line[1]),int(line[2]))
-    file.readline()
-    note=[]
-    for i in file.readlines():
-        line=i.strip(" \n").split(" ")
-        hanzi=line[0]
-        pinyin=line[1]
-        start=int(line[2])
-        length=int(line[3])
-        notenum=83-int(line[4])
-        cle=int(line[5])
-        vel=int(line[6])
-        por=int(line[7])
-        viblen=int(line[8])
-        vibdep=int(line[9])
-        vibrat=int(line[10])
-        dyn=np.array([int(i) for i in line[11].split(",")[1:]])
-        pit=np.array([int(i) for i in line[12].split(",")[1:]])
-        pbs=int(line[13])
-        note+=[Nnnote(hanzi,pinyin,start,length,notenum,cle,vel,por,viblen,vibdep,vibrat,dyn,pit,pbs)]
+    with open(filename,"r",encoding="utf8") as file:
+        line=file.readline().split(" ")
+        tempo=float(line[0])
+        beats=(int(line[1]),int(line[2]))
+        file.readline()
+        note=[]
+        for i in file.readlines():
+            line=i.strip(" \n").split(" ")
+            hanzi=line[0]
+            pinyin=line[1]
+            start=int(line[2])
+            length=int(line[3])
+            notenum=83-int(line[4])
+            cle=int(line[5])
+            vel=int(line[6])
+            por=int(line[7])
+            viblen=int(line[8])
+            vibdep=int(line[9])
+            vibrat=int(line[10])
+            dyn=np.array([int(i) for i in line[11].split(",")[1:]])
+            pit=np.array([int(i) for i in line[12].split(",")[1:]])
+            pbs=int(line[13])
+            note+=[Nnnote(hanzi,pinyin,start,length,notenum,cle,vel,por,viblen,vibdep,vibrat,dyn,pit,pbs)]
     return Nnfile(tempo=tempo,beats=beats,note=note)
-def notenum2str(notenum:int):
-    '''
-    将mid和ust中的音高（C4为60）转为字符串
-    '''
-    notenumstrs=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
-    return notenumstrs[notenum%12]+str((notenum)//12-1)
