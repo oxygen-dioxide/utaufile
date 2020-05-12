@@ -2,6 +2,9 @@ __version__='0.0.3'
 
 import math
 import numpy as np
+
+#midi库分为两种，一种基于事件，另一种基于音符。基于音符的midi库更适合本工程
+#但是我还没有找到支持歌词的基于音符的midi库，所以选择了基于事件的mido
 from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
 
 #UTAU
@@ -136,7 +139,26 @@ class Ustfile():
         获取ust工程的总长度
         '''
         return sum([i.length for i in self.note])
+    
+    def quantize(self,d:int):
+        '''
+        将UST工程按照给定的分度值（四分音符为480）量化。
+        将所有音符的边界四舍五入到d的整数倍，过短的音符将被删除。
+        例如，如果需要量化到八分音符，请使用f.quantize(240)
+        '''
+        #TODO
+        note_new=[]
+        tick=0
+        for i in self.note:
+            tick_c=int(round((tick+i.length)/d))*d
+            i.length=tick_c-tick
+            if(i.length>0):
+                note_new+=[i]
+            tick=tick_c
+        self.note=note_new
+        return self
         
+    
     def to_midi_track(self):
         '''
         将ust文件对象转换为mido.MidiTrack对象
@@ -271,7 +293,7 @@ def readint(flag):
     flag=flag[i:]
     return(flag,value)
     
-def parseflag(flag:str,flagtype,usedefault=False)->dict:
+def parseflag(flag:str,flagtype:set,usedefault=False)->dict:
     '''
     解析flag，返回字典
     flagtype：由元组组成的集合，每个元组第0项为字符串,例如"b","g","Mt"等，第1项为默认值。可参考utaufile.flag库
