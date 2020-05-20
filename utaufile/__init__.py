@@ -5,7 +5,10 @@ import numpy as np
 
 #midi库分为两种，一种基于事件，另一种基于音符。基于音符的midi库更适合本工程
 #但是我还没有找到支持歌词的基于音符的midi库，所以选择了基于事件的mido
-from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
+try:
+    import mido
+except:
+    pass
 
 #UTAU
 class Ustnote():
@@ -17,7 +20,12 @@ class Ustnote():
     properties:其他所有数据，dict
     properties中，以"_"开头的键被视为临时变量，不被写入UST文件
     '''
-    def __init__(self,length:int,lyric:str,notenum:int,properties:dict={}):
+    def __init__(self,length:int,
+                 lyric:str,
+                 notenum:int,
+                 properties:dict={}):
+        if(properties=={}):
+            properties={}
         self.length=length
         self.lyric=lyric
         self.notenum=notenum 
@@ -36,15 +44,29 @@ class Ustnote():
         '''
         return (self.lyric in [""," ","r","R"])
 
+    def to_music21_note(self):
+        import music21
+        if(self.isR()):
+            n=music21.note.Rest()
+        else:
+            n=music21.note.Note(self.notenum)
+            n.lyric=self.lyric
+        n.duration=music21.duration.Duration(self.length/480)
+        return n
+
 class Ustfile():
     '''
     ust文件类
     properties:工程整体属性(即[#SETTING]块),dict
     note:音符，list                    
     '''
-    def __init__(self,properties:dict={},notes:list=[]):
+    def __init__(self,properties:dict={},note:list=[]):
+        if(note==[]):
+            note=[]
+        if(properties=={}):
+            properties={}
         self.properties=properties
-        self.note=notes
+        self.note=note
         
     def __str__(self):
         s='[#SETTING]\n'
@@ -146,7 +168,6 @@ class Ustfile():
         将所有音符的边界四舍五入到d的整数倍，过短的音符将被删除。
         例如，如果需要量化到八分音符，请使用f.quantize(240)
         '''
-        #TODO
         note_new=[]
         tick=0
         for i in self.note:
@@ -158,32 +179,33 @@ class Ustfile():
         self.note=note_new
         return self
         
-    
     def to_midi_track(self):
         '''
         将ust文件对象转换为mido.MidiTrack对象
         '''
-        track=MidiTrack()
+        import mido
+        track=mido.MidiTrack()
         tick=0
         for note in self.note:
             if(note.isR()):
                 tick+=note.length
             else:
-                track.append(MetaMessage('lyrics',text=note.lyric,time=tick))
+                track.append(mido.MetaMessage('lyrics',text=note.lyric,time=tick))
                 tick=0
-                track.append(Message('note_on', note=note.notenum,velocity=64,time=0))
-                track.append(Message('note_off',note=note.notenum,velocity=64,time=note.length))
-        track.append(MetaMessage('end_of_track'))
+                track.append(mido.Message('note_on', note=note.notenum,velocity=64,time=0))
+                track.append(mido.Message('note_off',note=note.notenum,velocity=64,time=note.length))
+        track.append(mido.MetaMessage('end_of_track'))
         return(track)
     
     def to_midi_file(self,filename:str=""):
         '''
         将ust文件对象转换为mid文件和mido.MidiFile对象
         '''
-        mid = MidiFile()
-        ctrltrack=MidiTrack()
-        ctrltrack.append(MetaMessage('track_name',name='Control',time=0))
-        ctrltrack.append(MetaMessage('set_tempo',tempo=bpm2tempo(self.properties.get("Tempo",120)),time=0))
+        import mido
+        mid = mido.MidiFile()
+        ctrltrack=mido.MidiTrack()
+        ctrltrack.append(mido.MetaMessage('track_name',name='Control',time=0))
+        ctrltrack.append(mido.MetaMessage('set_tempo',tempo=mido.bpm2tempo(self.properties.get("Tempo",120)),time=0))
         mid.tracks.append(ctrltrack)
         mid.tracks.append(self.to_midi_track())
         if(filename!=""):
@@ -206,7 +228,25 @@ class Ustfile():
                                 length=time//60-starttime//60,
                                 notenum=i.notenum)]
         return nn
-    
+
+    def to_music21_stream(self):
+        '''
+        将ust文件对象转换为music21 stream，并自动判断调性
+        '''
+        #其他文件转music21 stream，将一律先转UST，再转music21 stream
+        #因为UST将音轨描述为音符和休止符组成，这与music21不谋而合
+        import music21
+        st=music21.stream.Stream()
+        for n in self.note:
+            st.append(n.to_music21_note())
+        st.insert(0,st.analyze("key"))
+        ks=st.keySignature
+        #由于music21音符默认带有还原符号，需要一个个消除
+        for n in st.notes:
+            if(ks.getScaleDegreeAndAccidentalFromPitch(n.pitch)[1]==None and n.pitch.accidental==music21.pitch.Accidental(0)):
+                n.pitch.accidental=None
+        return st
+
 def ustvaluetyper(key,value):#根据ust中的键决定值的类型
     types={
         "Length":int,
@@ -405,6 +445,8 @@ class Nnfile():
     note:音符，Nnnote的列表
     '''
     def __init__(self,tempo:int=120,beats:tuple=(4,4),note:list=[]):
+        if(note==[]):
+            note=[]
         self.tempo=tempo
         self.beats=beats
         self.note=note
@@ -461,34 +503,42 @@ class Nnfile():
         将nn文件对象转换为mido.MidiTrack对象
         默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
         '''
-        track=MidiTrack()
+        import mido
+        track=mido.MidiTrack()
         time=0
         for note in self.note:
             if(use_hanzi):
-                track.append(MetaMessage('lyrics',text=note.hanzi,time=(note.start-time)*60))
+                track.append(mido.MetaMessage('lyrics',text=note.hanzi,time=(note.start-time)*60))
             else:
-                track.append(MetaMessage('lyrics',text=note.pinyin,time=(note.start-time)*60))
-            track.append(Message('note_on', note=note.notenum,velocity=64,time=0))
-            track.append(Message('note_off',note=note.notenum,velocity=64,time=note.length*60))
+                track.append(mido.MetaMessage('lyrics',text=note.pinyin,time=(note.start-time)*60))
+            track.append(mido.Message('note_on', note=note.notenum,velocity=64,time=0))
+            track.append(mido.Message('note_off',note=note.notenum,velocity=64,time=note.length*60))
             time=note.start+note.length
-        track.append(MetaMessage('end_of_track'))
+        track.append(mido.MetaMessage('end_of_track'))
         return track
-
+    
     def to_midi_file(self,filename:str="",use_hanzi:bool=False):
         '''
         将nn文件对象转换为mid文件与mido.MidiFile对象
         默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
         '''
-        mid = MidiFile()
-        ctrltrack=MidiTrack()
-        ctrltrack.append(MetaMessage('track_name',name='Control',time=0))
-        ctrltrack.append(MetaMessage('set_tempo',tempo=bpm2tempo(self.tempo),time=0))
+        import mido
+        mid = mido.MidiFile()
+        ctrltrack=mido.MidiTrack()
+        ctrltrack.append(mido.MetaMessage('track_name',name='Control',time=0))
+        ctrltrack.append(mido.MetaMessage('set_tempo',tempo=mido.bpm2tempo(self.tempo),time=0))
         mid.tracks.append(ctrltrack)
         mid.tracks.append(self.to_midi_track(use_hanzi))
         if(filename!=""):
             mid.save(filename)
         return mid
         pass
+            
+    def to_music21_stream(self,use_hanzi:bool=False):
+        '''
+        将nn文件对象转换为music21 stream
+        '''
+        return self.to_ust_file(use_hanzi=use_hanzi).to_music21_stream()
     
 def opennn(filename:str):
     '''
