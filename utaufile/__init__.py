@@ -1,14 +1,7 @@
-__version__='0.0.3'
+__version__='0.0.4'
 
 import math
 import numpy as np
-
-#midi库分为两种，一种基于事件，另一种基于音符。基于音符的midi库更适合本工程
-#但是我还没有找到支持歌词的基于音符的midi库，所以选择了基于事件的mido
-try:
-    import mido
-except:
-    pass
 
 #UTAU
 class Ustnote():
