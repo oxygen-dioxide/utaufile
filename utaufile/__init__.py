@@ -2,6 +2,7 @@ __version__='0.0.4'
 
 import math
 import numpy as np
+from typing import Dict, Tuple
 
 #UTAU
 class Ustnote():
@@ -38,6 +39,9 @@ class Ustnote():
         return (self.lyric in [""," ","r","R"])
 
     def to_music21_note(self):
+        '''
+        将UTAU音符对象转为music21音符对象
+        '''
         import music21
         if(self.isR()):
             n=music21.note.Rest()
@@ -98,7 +102,7 @@ class Ustfile():
                 lyric+=[i.lyric]
         return lyric
     
-    def replacelyric(self,dictionary:dict,start:int=0,end:int=0):
+    def replacelyric(self,dictionary:Dict[str,str],start:int=0,end:int=0):
         '''
         按字典替换歌词
         start：指定替换歌词区间的起点
@@ -209,7 +213,7 @@ class Ustfile():
         '''
         将ust文件对象转换为nn文件对象
         '''
-        nn=Nnfile(tempo=self.properties.get("Tempo",120))
+        nn=Nnfile(tempo=self.properties.get("Tempo",120.0))
         time=0
         for i in self.note:
             starttime=time
@@ -239,6 +243,41 @@ class Ustfile():
             if(ks.getScaleDegreeAndAccidentalFromPitch(n.pitch)[1]==None and n.pitch.accidental==music21.pitch.Accidental(0)):
                 n.pitch.accidental=None
         return st
+
+    def to_dv_segment(self):
+        '''
+        将ust文件对象转换为dv区段对象
+        '''
+        time=0
+        import dvfile
+        dvnotes=[]
+        for i in self.note:
+            if(not i.isR()):
+                dvnotes.append(dvfile.Dvnote(hanzi=i.lyric,
+                                pinyin=i.lyric,
+                                start=time,
+                                length=i.length,
+                                notenum=i.notenum))
+            time+=i.length
+        return dvfile.Dvsegment(start=1920,
+                                length=time,
+                                note=dvnotes)
+
+    def to_dv_track(self):
+        '''
+        将ust文件对象转换为dv音轨对象
+        '''
+        import dvfile
+        return dvfile.Dvtrack(segment=[self.to_dv_segment()])
+
+    def to_dv_file(self):
+        '''
+        将ust文件对象转换为dv文件对象
+        '''
+        import dvfile
+        return dvfile.Dvfile(tempo=[(0,self.properties.get("Tempo",120.0))],
+                             beats=[(-3,4,4)],
+                             track=[self.to_dv_track()])
 
 def ustvaluetyper(key,value):#根据ust中的键决定值的类型
     types={
@@ -283,12 +322,13 @@ def openust(filename:str):
         #逐行解码
         try:
             line=str(line,encoding=encoding)
-        except:
+        except UnicodeDecodeError:
             #如果某行编码与其他行不同，则尝试各种编码
             for i in ["gbk","utf-8","shift-JIS"]:
                 try:
                     line=str(line,encoding=i)
-                except:
+                    break
+                except UnicodeDecodeError:
                     pass
         if(line.startswith("[")):
             blocks+=[block]
@@ -326,7 +366,7 @@ def readint(flag):
     flag=flag[i:]
     return(flag,value)
     
-def parseflag(flag:str,flagtype:set,usedefault=False)->dict:
+def parseflag(flag:str,flagtype:set,usedefault:bool=False)->dict:
     '''
     解析flag，返回字典
     flagtype：由元组组成的集合，每个元组第0项为字符串,例如"b","g","Mt"等，第1项为默认值。可参考utaufile.flag库
@@ -361,6 +401,7 @@ def dumpflag(flagdict:dict)->str:
         elif(type(value)==int):
             flag+=key+str(value)
     return flag
+
 #NN
 class Nnnote():
     '''
@@ -417,6 +458,7 @@ class Nnnote():
             ",".join(["100"]+[str(int(i)) for i in self.pit]),
             str(self.pbs)])+"\n"
         return s
+    
     def getpitbend(self):
         '''
         获得音符的pit参数对音符的作用量（pit*pbs）,单位为半音，返回numpy.ndarray
@@ -437,7 +479,10 @@ class Nnfile():
     beats:节拍，元组，第0项为每小节拍数，第1项为以X分音符为1拍
     note:音符，Nnnote的列表
     '''
-    def __init__(self,tempo:int=120,beats:tuple=(4,4),note:list=[]):
+    def __init__(self,
+                 tempo:float=120.0,
+                 beats:Tuple[int,int]=(4,4),
+                 note:list=[]):
         if(note==[]):
             note=[]
         self.tempo=tempo
@@ -530,9 +575,38 @@ class Nnfile():
     def to_music21_stream(self,use_hanzi:bool=False):
         '''
         将nn文件对象转换为music21 stream
+        默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
         '''
         return self.to_ust_file(use_hanzi=use_hanzi).to_music21_stream()
     
+    def to_dv_segment(self):
+        '''
+        将nn文件对象转换为dv区段对象
+        '''
+        import dvfile
+        dvnotes=[]
+        for n in self.note:
+            dvnotes.append(dvfile.Dvnote(n.start*60,n.length*60,n.notenum,n.pinyin,n.hanzi))
+        return dvfile.Dvsegment(start=7680*self.beats[0]//self.beats[1],
+                                length=dvnotes[-1].start+dvnotes[-1].length,
+                                note=dvnotes)
+
+    def to_dv_track(self):
+        '''
+        将nn文件对象转换为dv音轨对象
+        '''
+        import dvfile
+        return dvfile.Dvtrack(segment=[self.to_dv_segment()])
+
+    def to_dv_file(self):
+        '''
+        将nn文件对象转换为dv文件对象
+        '''
+        import dvfile
+        return dvfile.Dvfile(tempo=[(0,self.tempo)],
+                             beats=[(-3,self.beats[0],self.beats[1])],
+                             track=[self.to_dv_track()])
+
 def opennn(filename:str):
     '''
     打开nn文件，返回Nnfile对象
@@ -561,3 +635,9 @@ def opennn(filename:str):
             pbs=int(line[13])
             note+=[Nnnote(hanzi,pinyin,start,length,notenum,cle,vel,por,viblen,vibdep,vibrat,dyn,pit,pbs)]
     return Nnfile(tempo=tempo,beats=beats,note=note)
+
+def main():
+    openust(r"C:\Users\lin\Desktop\废话歌presamp-cvvc.ust").to_dv_file().save(r"C:\Users\lin\Desktop\废话歌.dv")
+
+if(__name__=="__main__"):
+    main()
