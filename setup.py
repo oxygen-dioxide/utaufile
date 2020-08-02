@@ -19,13 +19,14 @@ DESCRIPTION = 'Read and write UTAU ust file and NiaoNIAO nn file'
 URL = 'https://gitee.com/oxygendioxide/utaufile'
 EMAIL = '1463567152@qq.com'    
 AUTHOR = 'oxygen dioxide'
-REQUIRES_PYTHON = '>=3.6.0' 
-VERSION = '0.0.3'
+REQUIRES_PYTHON = '>=3.5.0' 
+VERSION = '0.0.4'
     
 REQUIRED = ["numpy"]    
 EXTRAS = {
     "export midi":["mido"],
-    "export sheet":["music21"]
+    "export sheet":["music21"],
+    "export dv":["dvfile"]
     }
 
 # The rest you shouldn't have to touch too much :)

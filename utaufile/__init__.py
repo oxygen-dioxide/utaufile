@@ -238,10 +238,12 @@ class Ustfile():
             st.append(n.to_music21_note())
         st.insert(0,st.analyze("key"))
         ks=st.keySignature
-        #由于music21音符默认带有还原符号，需要一个个消除
+        #消除还原符号，把音高数值嵌入到调性中。
+        pitchdict={p.pitchClass:p.name for p in ks.getPitches()}
         for n in st.notes:
-            if(ks.getScaleDegreeAndAccidentalFromPitch(n.pitch)[1]==None and n.pitch.accidental==music21.pitch.Accidental(0)):
-                n.pitch.accidental=None
+            m=n.pitch.midi
+            n.name=pitchdict.get(n.pitch.pitchClass,n.name)
+            n.octave+=(m-n.pitch.midi)//12
         return st
 
     def to_dv_segment(self):
@@ -637,7 +639,7 @@ def opennn(filename:str):
     return Nnfile(tempo=tempo,beats=beats,note=note)
 
 def main():
-    openust(r"C:\Users\lin\Desktop\废话歌presamp-cvvc.ust").to_dv_file().save(r"C:\Users\lin\Desktop\废话歌.dv")
+    openust(r"C:\Users\lin\Desktop\只要平凡.ust").to_music21_stream().show()
 
 if(__name__=="__main__"):
     main()

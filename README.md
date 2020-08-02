@@ -14,6 +14,7 @@
 - 解析与写入ust文件
 - 导出nn文件
 - 导出mid文件（需要[mido](https://mido.readthedocs.io/en/latest/index.html)）
+- 导出dv文件（需要[dvfile](https://gitee.com/oxygendioxide/dvfile)）
 - 导出五线谱（需要[music21](http://web.mit.edu/music21/doc/index.html)）
 - 批量获取、替换、设置歌词
 - flag解析
@@ -24,6 +25,7 @@
 - 解析与写入nn文件
 - 导出ust文件
 - 导出mid文件（需要[mido](https://mido.readthedocs.io/en/latest/index.html)）
+- 导出dv文件（需要[dvfile](https://gitee.com/oxygendioxide/dvfile)）
 - 导出五线谱（需要[music21](http://web.mit.edu/music21/doc/index.html)）
 
 #### 参与贡献
