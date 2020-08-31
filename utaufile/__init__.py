@@ -1,8 +1,8 @@
-__version__='0.0.4'
+__version__='0.1.0'
 
 import math
 import numpy as np
-from typing import Dict, Tuple
+from typing import Dict,Tuple,List
 
 #UTAU
 class Ustnote():
@@ -22,14 +22,17 @@ class Ustnote():
             properties={}
         self.length=length
         self.lyric=lyric
-        self.notenum=notenum 
+        self.notenum=notenum
         self.properties=properties
         
     def __str__(self):
+        #必有数据Length、Lyric、Notenum
         s="Length={}\nLyric={}\nNoteNum={}\n".format(self.length,self.lyric,self.notenum)
-        for i in self.properties.keys():
+
+        pr=self.properties
+        for i in pr.keys():
             if(not i.startswith("_")):
-                s+="{}={}\n".format(i,self.properties[i])
+                s+="{}={}\n".format(i,pr[i])
         return s
     
     def isR(self)->bool:
@@ -54,19 +57,26 @@ class Ustnote():
 class Ustfile():
     '''
     ust文件类
+    note:音符，list
+    tempo:曲速，float
     properties:工程整体属性(即[#SETTING]块),dict
-    note:音符，list                    
     '''
-    def __init__(self,properties:dict={},note:list=[]):
+    def __init__(self,
+                 note:List[Ustnote]=[],
+                 tempo:float=120,
+                 properties:dict={}):
         if(note==[]):
             note=[]
         if(properties=={}):
             properties={}
-        self.properties=properties
-        self.note=note
+        self.tempo:float=tempo
+        self.properties:dict=properties
+        self.note:List[Ustnote]=note
         
     def __str__(self):
         s='[#SETTING]\n'
+        pro=self.properties.copy()
+        pro["Tempo"]=self.tempo
         for i in self.properties.keys():
             s+="{}={}\n".format(i,self.properties[i])
         for i in range(0,len(self.note)):
@@ -176,6 +186,15 @@ class Ustfile():
         self.note=note_new
         return self
         
+    def transpose(self,n:int):
+        """
+        对utau工程移调
+        n：移调半音数，向上为正，向下为负。
+        """
+        for note in self.note:
+            note.notenum+=n
+        return self
+
     def to_midi_track(self):
         '''
         将ust文件对象转换为mido.MidiTrack对象
@@ -202,7 +221,7 @@ class Ustfile():
         mid = mido.MidiFile()
         ctrltrack=mido.MidiTrack()
         ctrltrack.append(mido.MetaMessage('track_name',name='Control',time=0))
-        ctrltrack.append(mido.MetaMessage('set_tempo',tempo=mido.bpm2tempo(self.properties.get("Tempo",120)),time=0))
+        ctrltrack.append(mido.MetaMessage('set_tempo',tempo=mido.bpm2tempo(self.tempo),time=0))
         mid.tracks.append(ctrltrack)
         mid.tracks.append(self.to_midi_track())
         if(filename!=""):
@@ -213,7 +232,7 @@ class Ustfile():
         '''
         将ust文件对象转换为nn文件对象
         '''
-        nn=Nnfile(tempo=self.properties.get("Tempo",120.0))
+        nn=Nnfile(tempo=self.tempo)
         time=0
         for i in self.note:
             starttime=time
@@ -236,7 +255,11 @@ class Ustfile():
         st=music21.stream.Stream()
         for n in self.note:
             st.append(n.to_music21_note())
-        st.insert(0,st.analyze("key"))
+        try:
+            k=st.analyze("key")
+        except music21.analysis.discrete.DiscreteAnalysisException:
+            k=music21.key.Key('C')
+        st.insert(0,k)
         ks=st.keySignature
         #消除还原符号，把音高数值嵌入到调性中。
         pitchdict={p.pitchClass:p.name for p in ks.getPitches()}
@@ -244,6 +267,9 @@ class Ustfile():
             m=n.pitch.midi
             n.name=pitchdict.get(n.pitch.pitchClass,n.name)
             n.octave+=(m-n.pitch.midi)//12
+        #曲速
+        if(self.tempo>0):
+            st.insert(music21.tempo.MetronomeMark(number=self.tempo))
         return st
 
     def to_dv_segment(self):
@@ -277,7 +303,7 @@ class Ustfile():
         将ust文件对象转换为dv文件对象
         '''
         import dvfile
-        return dvfile.Dvfile(tempo=[(0,self.properties.get("Tempo",120.0))],
+        return dvfile.Dvfile(tempo=[(0,self.tempo)],
                              beats=[(-3,4,4)],
                              track=[self.to_dv_track()])
 
@@ -323,19 +349,21 @@ def openust(filename:str):
         line=line.strip(b"\r")
         #逐行解码
         try:
-            line=str(line,encoding=encoding)
+            linestr=str(line,encoding=encoding)
         except UnicodeDecodeError:
             #如果某行编码与其他行不同，则尝试各种编码
             for i in ["gbk","utf-8","shift-JIS"]:
                 try:
-                    line=str(line,encoding=i)
+                    linestr=str(line,encoding=i)
                     break
                 except UnicodeDecodeError:
                     pass
-        if(line.startswith("[")):
-            blocks+=[block]
+            else:
+                linestr=""
+        if(linestr.startswith("[")):
+            blocks.append(block)
             block=[]
-        block+=[line]
+        block.append(linestr)
     #读文件头
     fileproperties={}
     for line in blocks[2]:
@@ -343,6 +371,7 @@ def openust(filename:str):
             [key,value]=line.split("=")
             if(value!=""):
                 fileproperties[key]=ustvaluetyper(key,value)
+    tempo=fileproperties.pop("Tempo",120.0)
     #读音符
     notes=[]
     for block in blocks[3:]:
@@ -355,15 +384,20 @@ def openust(filename:str):
         length=noteproperties.pop("Length")
         notenum=noteproperties.pop("NoteNum")
         lyric=noteproperties.pop("Lyric")
-        notes+=[Ustnote(length,lyric,notenum,noteproperties)]
-    return Ustfile(fileproperties,notes)
+        notes.append(Ustnote(length=length,
+                             lyric=lyric,
+                             notenum=notenum,
+                             properties=noteproperties))
+    return Ustfile(properties=fileproperties,
+                   note=notes,
+                   tempo=tempo)
 
 def readint(flag):
     for i in range(0,len(flag)):
         if(not flag[i] in ("+","-","1","2","3","4","5","6","7","8","9","0")):
             break
     else:
-        i+=1
+        i=i+1
     value=int(flag[0:i])
     flag=flag[i:]
     return(flag,value)
@@ -484,12 +518,12 @@ class Nnfile():
     def __init__(self,
                  tempo:float=120.0,
                  beats:Tuple[int,int]=(4,4),
-                 note:list=[]):
+                 note:List[Nnnote]=[]):
         if(note==[]):
             note=[]
-        self.tempo=tempo
-        self.beats=beats
-        self.note=note
+        self.tempo:float=tempo
+        self.beats:Tuple[int,int]=beats
+        self.note:List[Nnnote]=note
             
     def sort(self):
         '''
@@ -520,12 +554,21 @@ class Nnfile():
         with open(filename,encoding="utf8",mode="w") as file:
             file.write(str(self))
     
+    def transpose(self,n:int):
+        """
+        对nn工程移调
+        n：移调半音数，向上为正，向下为负。
+        """
+        for note in self.note:
+            note.notenum+=n
+        return self
+
     def to_ust_file(self,use_hanzi:bool=False):
         '''
         将nn文件对象转换为ust文件对象
         默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
         '''
-        ust=Ustfile(properties={'Tempo':self.tempo})
+        ust=Ustfile(tempo=self.tempo)
         time=0
         for note in self.note:
             if(note.start>time):
@@ -576,11 +619,16 @@ class Nnfile():
             
     def to_music21_stream(self,use_hanzi:bool=False):
         '''
-        将nn文件对象转换为music21 stream
+        将nn文件对象转换为music21 stream，并自动判断调性
         默认使用nn文件中的拼音，如果需要使用汉字，use_hanzi=True
         '''
-        return self.to_ust_file(use_hanzi=use_hanzi).to_music21_stream()
-    
+        import music21
+        st=self.to_ust_file(use_hanzi=use_hanzi).to_music21_stream()
+        ts=music21.meter.TimeSignature()
+        (ts.numerator,ts.denominator)=self.beats
+        st.insert(ts)
+        return st
+
     def to_dv_segment(self):
         '''
         将nn文件对象转换为dv区段对象
@@ -639,7 +687,7 @@ def opennn(filename:str):
     return Nnfile(tempo=tempo,beats=beats,note=note)
 
 def main():
-    openust(r"C:\Users\lin\Desktop\只要平凡.ust").to_music21_stream().show()
+    pass
 
 if(__name__=="__main__"):
     main()

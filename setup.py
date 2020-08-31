@@ -20,7 +20,7 @@ URL = 'https://gitee.com/oxygendioxide/utaufile'
 EMAIL = '1463567152@qq.com'    
 AUTHOR = 'oxygen dioxide'
 REQUIRES_PYTHON = '>=3.5.0' 
-VERSION = '0.0.4'
+VERSION = '0.1.0'
     
 REQUIRED = ["numpy"]    
 EXTRAS = {
